@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Readiness Assessment — Hybrid Agents</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --surface: #e8e8e5;
+    --surface2: #d8d8d4;
+    --border: rgba(0,0,0,0.12);
+    --border2: rgba(0,0,0,0.2);
+    --ink: #0a0a0a;
+    --muted: rgba(10,10,10,0.75);
+    --muted2: rgba(10,10,10,0.55);
+    --accent-hl: #e8ff47;
+    --radius-pill: 999px;
+    --radius-input: 10px;
+    --radius-card: 12px;
+  }
+
+  body { margin: 0; padding: 0; font-family: 'DM Sans', sans-serif; }
+
+  /* ── BACKDROP ── */
+  #quiz-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.55);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    z-index: 9998;
+    animation: fadeIn 0.25s ease;
+  }
+  #quiz-backdrop.open { display: block; }
+
+  /* ── MODAL ── */
+  #quiz-modal {
+    display: none;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: min(700px, 94vw);
+    max-height: 88vh;
+    background: #ffffff;
+    border-radius: 20px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    z-index: 9999;
+    box-shadow: 0 32px 80px rgba(0,0,0,0.25);
+    animation: modalIn 0.3s cubic-bezier(0.34,1.56,0.64,1) forwards;
+  }
+  #quiz-modal.open { display: block; }
+
+  @keyframes fadeIn  { from { opacity:0; } to { opacity:1; } }
+  @keyframes modalIn { from { opacity:0; transform:translate(-50%,-50%) scale(0.94); } to { opacity:1; transform:translate(-50%,-50%) scale(1); } }
+
+  /* ── CLOSE ── */
+  #quiz-close {
+    position: sticky;
+    top: 0;
+    display: flex;
+    justify-content: flex-end;
+    padding: 1rem 1.25rem 0;
+    z-index: 10;
+    background: #fff;
+  }
+  #quiz-close button {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    cursor: pointer;
+    font-size: 15px;
+    color: var(--ink);
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s;
+  }
+  #quiz-close button:hover { background: var(--surface2); transform: scale(1.1); }
+
+  /* ── WRAP ── */
+  .wrap { max-width: 600px; margin: 0 auto; padding: 1rem 2rem 3rem; }
+
+  /* ── PROGRESS ── */
+  .prog-wrap { margin-bottom: 2.5rem; }
+  .prog-meta { display: flex; justify-content: space-between; margin-bottom: 8px; }
+  .prog-label { font-size: 10px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted2); }
+  .prog-num { font-family: 'Bebas Neue', sans-serif; font-size: 15px; letter-spacing: 0.1em; color: var(--ink); }
+  .prog-track { height: 2px; background: var(--surface2); border-radius: 2px; }
+  .prog-fill { height: 100%; background: var(--ink); border-radius: 2px; transition: width 0.5s cubic-bezier(0.4,0,0.2,1); }
+
+  /* ── QUESTION CHROME ── */
+  .sec-tag { display: inline-block; font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink); margin-bottom: 1rem; padding: 4px 0; border-bottom: 1px solid var(--ink); }
+  .q-num { font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted2); margin-bottom: 0.75rem; }
+  .q-text { font-family: 'Bebas Neue', sans-serif; font-size: clamp(22px, 4vw, 34px); letter-spacing: 0.04em; line-height: 1.1; color: var(--ink); margin-bottom: 0.6rem; }
+  .q-sub { font-size: 13px; color: var(--muted); line-height: 1.6; margin-bottom: 2rem; max-width: 520px; }
+
+  /* ── SCALE ── */
+  .scale-grid { display: flex; gap: 8px; margin-bottom: 1rem; flex-wrap: wrap; }
+  .scale-btn { flex: 1; min-width: 52px; padding: 16px 8px; background: #fff; border: 1px solid var(--border2); border-radius: var(--radius-pill); cursor: pointer; transition: all 0.2s; text-align: center; color: var(--ink); font-family: 'Bebas Neue', sans-serif; font-size: 22px; letter-spacing: 0.05em; }
+  .scale-btn:hover { background: var(--surface); border-color: var(--ink); transform: translateY(-3px); }
+  .scale-btn.sel { background: var(--ink); border-color: var(--ink); color: var(--accent-hl); }
+  .scale-labels { display: flex; justify-content: space-between; margin-bottom: 2rem; }
+  .slabel { font-size: 11px; color: var(--muted); max-width: 130px; letter-spacing: 0.03em; }
+  .slabel:last-child { text-align: right; }
+
+  /* ── CHOICE ── */
+  .opts { display: flex; flex-direction: column; gap: 8px; margin-bottom: 2rem; }
+  .opt { display: flex; align-items: center; gap: 16px; padding: 15px 20px; background: #fff; border: 1px solid var(--border2); border-radius: var(--radius-card); cursor: pointer; transition: all 0.2s; text-align: left; width: 100%; color: var(--ink); font-family: 'DM Sans', sans-serif; font-size: 14px; line-height: 1.5; }
+  .opt:hover { background: var(--surface); border-color: var(--ink); padding-left: 26px; }
+  .opt.sel { background: var(--ink); border-color: var(--ink); color: #fff; }
+  .opt.sel .opt-ind { background: var(--accent-hl); border-color: var(--accent-hl); color: var(--ink); }
+  .opt-ind { width: 28px; height: 28px; min-width: 28px; border: 1px solid var(--border2); border-radius: var(--radius-pill); display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; font-family: 'Bebas Neue', sans-serif; letter-spacing: 0.05em; color: var(--muted); transition: all 0.2s; flex-shrink: 0; background: transparent; }
+
+  /* ── MULTI ── */
+  .multi-hint { font-size: 11px; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 1rem; display: flex; align-items: center; gap: 8px; }
+  .multi-hint::before { content: ''; width: 20px; height: 1px; background: var(--border2); }
+  .multi-grid { display: flex; flex-direction: column; gap: 8px; margin-bottom: 2rem; }
+  .mbtn { display: flex; align-items: center; gap: 14px; padding: 14px 20px; background: #fff; border: 1px solid var(--border2); border-radius: var(--radius-card); cursor: pointer; transition: all 0.2s; text-align: left; width: 100%; color: var(--ink); font-family: 'DM Sans', sans-serif; font-size: 14px; line-height: 1.5; }
+  .mbtn:hover { background: var(--surface); border-color: var(--ink); padding-left: 26px; }
+  .mbtn.sel { background: rgba(10,10,10,0.06); border-color: var(--ink); }
+  .chk { width: 20px; height: 20px; min-width: 20px; border: 1px solid var(--border2); border-radius: 6px; display: flex; align-items: center; justify-content: center; transition: all 0.2s; position: relative; flex-shrink: 0; background: #fff; }
+  .mbtn.sel .chk { background: var(--ink); border-color: var(--ink); }
+  .mbtn.sel .chk::after { content: ''; width: 9px; height: 5px; border-left: 2px solid #fff; border-bottom: 2px solid #fff; transform: rotate(-45deg) translateY(-1px); }
+
+  /* ── NAV ── */
+  .nav-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 0.5rem; }
+  .btn-back { padding: 14px 26px; background: transparent; border: 1px solid var(--border2); border-radius: var(--radius-pill); cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 13px; color: var(--muted); transition: all 0.2s; letter-spacing: 0.05em; }
+  .btn-back:hover { color: var(--ink); border-color: var(--ink); }
+  .btn-next { padding: 14px 36px; background: var(--ink); border: none; border-radius: var(--radius-pill); cursor: pointer; font-family: 'Bebas Neue', sans-serif; font-size: 16px; letter-spacing: 0.1em; color: #fff; transition: all 0.2s; flex: 1; max-width: 260px; }
+  .btn-next:hover { background: #2a2a2a; transform: translateY(-1px); }
+  .btn-next:disabled { opacity: 0.25; cursor: not-allowed; transform: none; }
+
+  /* ── SCREENS ── */
+  .screen { display: none; }
+  .screen.active { display: block; }
+
+  /* ── INTRO ── */
+  .intro-hero { padding: 1rem 0 2rem; text-align: center; }
+  .intro-eyebrow { font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); margin-bottom: 1.5rem; display: flex; align-items: center; justify-content: center; gap: 12px; }
+  .intro-eyebrow::before, .intro-eyebrow::after { content: ''; flex: 1; max-width: 60px; height: 1px; background: var(--border2); }
+  .intro-h { font-family: 'Bebas Neue', sans-serif; font-size: clamp(38px, 8vw, 68px); letter-spacing: 0.05em; line-height: 0.95; color: var(--ink); margin-bottom: 0.3rem; }
+  .intro-h .hl { -webkit-text-stroke: 1.5px var(--ink); -webkit-text-fill-color: transparent; }
+  .intro-sub-h { font-family: 'Bebas Neue', sans-serif; font-size: clamp(14px, 2.5vw, 20px); letter-spacing: 0.15em; color: var(--muted); margin-bottom: 1.25rem; }
+  .intro-desc { font-size: 15px; color: var(--muted); line-height: 1.7; max-width: 440px; margin: 0 auto 2rem; }
+  .intro-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 1px; background: var(--border2); max-width: 360px; margin: 0 auto 2rem; border: 1px solid var(--border2); border-radius: var(--radius-card); overflow: hidden; }
+  .ig-cell { background: var(--surface); padding: 14px 12px; text-align: center; }
+  .ig-num { font-family: 'Bebas Neue', sans-serif; font-size: 24px; letter-spacing: 0.05em; color: var(--ink); }
+  .ig-label { font-size: 10px; color: var(--muted); letter-spacing: 0.12em; text-transform: uppercase; margin-top: 3px; }
+  .btn-start { padding: 16px 48px; background: var(--ink); border: none; border-radius: var(--radius-pill); cursor: pointer; font-family: 'Bebas Neue', sans-serif; font-size: 16px; letter-spacing: 0.12em; color: #fff; transition: all 0.25s; width: 100%; max-width: 300px; }
+  .btn-start:hover { background: #2a2a2a; transform: translateY(-2px); }
+
+  /* ── CAPTURE ── */
+  .cap-wrap { animation: slideIn 0.35s ease; }
+  .elabel { font-size: 10px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; display: block; }
+  .einput { width: 100%; padding: 15px 18px; background: #fff; border: 1px solid var(--border2); border-radius: var(--radius-input); color: var(--ink); font-family: 'DM Sans', sans-serif; font-size: 14px; outline: none; transition: border-color 0.2s; margin-bottom: 14px; }
+  .einput:focus { border-color: var(--ink); }
+  .einput::placeholder { color: var(--muted2); }
+  .btn-submit { padding: 17px 0; background: var(--ink); border: none; border-radius: var(--radius-pill); cursor: pointer; font-family: 'Bebas Neue', sans-serif; font-size: 16px; letter-spacing: 0.12em; color: #fff; width: 100%; margin-top: 6px; transition: all 0.2s; }
+  .btn-submit:hover:not(:disabled) { background: #2a2a2a; transform: translateY(-1px); }
+  .btn-submit:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
+  .send-status { text-align: center; padding: 0.75rem 0; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); display: none; }
+  .send-status.visible { display: block; }
+
+  /* ── REPORT ── */
+  .report-wrap { animation: fadeUp 0.4s ease; }
+  .success-banner { background: rgba(0,160,80,0.08); border: 1px solid rgba(0,160,80,0.25); border-radius: var(--radius-card); padding: 1rem 1.25rem; margin-bottom: 1.5rem; font-size: 11px; color: rgba(0,110,50,1); letter-spacing: 0.1em; text-transform: uppercase; text-align: center; display: none; }
+  .success-banner.visible { display: block; }
+  .rpt-header { text-align: center; padding: 1.75rem 0 2.25rem; border-bottom: 1px solid var(--border); }
+  .score-ring { width: 110px; height: 110px; border: 1.5px solid var(--ink); border-radius: var(--radius-pill); margin: 0 auto 1.5rem; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .score-big { font-family: 'Bebas Neue', sans-serif; font-size: 42px; letter-spacing: 0.03em; line-height: 1; color: var(--ink); }
+  .score-denom { font-size: 11px; color: var(--muted); letter-spacing: 0.08em; }
+  .rpt-tier { font-family: 'Bebas Neue', sans-serif; font-size: clamp(20px,4vw,30px); letter-spacing: 0.06em; margin-bottom: 0.75rem; color: var(--ink); }
+  .rpt-headline { font-size: 14px; color: var(--muted); line-height: 1.6; max-width: 440px; margin: 0 auto; }
+  .rpt-block { background: #fff; border: 1px solid var(--border2); border-radius: var(--radius-card); padding: 1.5rem; margin-bottom: 10px; }
+  .rpt-block-title { font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); margin-bottom: 1.25rem; padding-left: 12px; border-left: 2px solid var(--ink); }
+  .pain-row { display: flex; align-items: flex-start; gap: 14px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+  .pain-row:last-child { border: none; padding-bottom: 0; }
+  .pain-ico { width: 34px; height: 34px; min-width: 34px; background: var(--surface); border: 1px solid var(--border2); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 15px; }
+  .pain-title { font-size: 13px; font-weight: 500; color: var(--ink); margin-bottom: 3px; }
+  .pain-body { font-size: 13px; color: var(--muted); line-height: 1.6; }
+  .opp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 1rem; }
+  .opp-cell { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 1.25rem; }
+  .opp-label { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+  .opp-val { font-family: 'Bebas Neue', sans-serif; font-size: 17px; letter-spacing: 0.05em; color: var(--ink); line-height: 1.2; }
+  .callout { padding: 1.25rem 1.5rem; background: var(--surface); border-left: 2px solid var(--ink); border-radius: 0 8px 8px 0; margin: 1rem 0; }
+  .callout-text { font-size: 14px; line-height: 1.6; color: var(--ink); }
+  .cta-block { background: var(--ink); border-radius: var(--radius-card); padding: 2rem; text-align: center; margin-top: 10px; }
+  .cta-title { font-family: 'Bebas Neue', sans-serif; font-size: clamp(22px,4vw,34px); letter-spacing: 0.06em; margin-bottom: 0.75rem; color: #fff; }
+  .cta-desc { font-size: 13px; color: rgba(255,255,255,0.7); line-height: 1.6; margin-bottom: 1.75rem; max-width: 380px; margin-left: auto; margin-right: auto; }
+  .btn-cta { display: block; padding: 17px 0; background: var(--accent-hl); border: none; border-radius: var(--radius-pill); cursor: pointer; font-family: 'Bebas Neue', sans-serif; font-size: 16px; letter-spacing: 0.12em; color: var(--ink); text-decoration: none; transition: all 0.25s; width: 100%; margin-bottom: 1rem; }
+  .btn-cta:hover { background: #d4ea30; transform: translateY(-1px); }
+  .email-note { font-size: 11px; color: rgba(255,255,255,0.5); letter-spacing: 0.05em; }
+
+  /* ── ANIMATIONS ── */
+  .q-anim { animation: slideIn 0.3s ease; }
+  @keyframes slideIn { from { opacity:0; transform:translateX(20px); } to { opacity:1; transform:translateX(0); } }
+  @keyframes fadeUp  { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
+
+  @media (max-width: 480px) {
+    .wrap { padding: 0.5rem 1.25rem 2.5rem; }
+    .scale-grid { gap: 6px; }
+    .opp-grid { grid-template-columns: 1fr; }
+    .btn-next { max-width: 100%; }
+    #quiz-modal { border-radius: 20px 20px 0 0; top: auto; bottom: 0; left: 0; transform: none; width: 100%; max-height: 92vh; }
+  }
+</style>
+</head>
+<body>
+
+<div id="quiz-backdrop" onclick="closeQuiz()"></div>
+
+<div id="quiz-modal" role="dialog" aria-modal="true" aria-label="AI Readiness Assessment">
+  <div id="quiz-close">
+    <button onclick="closeQuiz()" aria-label="Close quiz">✕</button>
+  </div>
+
+  <div class="wrap">
+
+    <div id="screen-intro" class="screen active">
+      <div class="intro-hero">
+        <div class="intro-eyebrow">Free Business Assessment</div>
+        <div class="intro-h">IS YOUR<br>BUSINESS<br><span class="hl">AI READY?</span></div>
+        <div class="intro-sub-h">HYBRID AGENT ASSESSMENT</div>
+        <p class="intro-desc">15 targeted questions. A personalised report showing exactly where agentic AI could save you time, cut costs, and scale your revenue — built around your answers.</p>
+        <div class="intro-grid">
+          <div class="ig-cell"><div class="ig-num">15</div><div class="ig-label">Questions</div></div>
+          <div class="ig-cell"><div class="ig-num">~4</div><div class="ig-label">Minutes</div></div>
+          <div class="ig-cell"><div class="ig-num">1</div><div class="ig-label">Free Report</div></div>
+        </div>
+        <button class="btn-start" onclick="startQuiz()">BEGIN ASSESSMENT →</button>
+      </div>
+    </div>
+
+    <div id="screen-quiz" class="screen">
+      <div class="prog-wrap">
+        <div class="prog-meta">
+          <span class="prog-label">Progress</span>
+          <span class="prog-num" id="prog-count">01 / 15</span>
+        </div>
+        <div class="prog-track"><div class="prog-fill" id="prog-fill" style="width:6.67%"></div></div>
+      </div>
+      <div id="q-container" class="q-anim"></div>
+    </div>
+
+    <div id="screen-capture" class="screen">
+      <div class="cap-wrap">
+        <div class="sec-tag">Almost There</div>
+        <div class="q-text">Where should we send your report?</div>
+        <div class="q-sub">Your personalised assessment is ready. Enter your details and we'll deliver your full report — including exactly where AI can transform your business fastest.</div>
+        <label class="elabel">Your name</label>
+        <input class="einput" type="text" id="user-name" placeholder="e.g. James Fletcher" />
+        <label class="elabel">Business email</label>
+        <input class="einput" type="email" id="user-email" placeholder="james@yourbusiness.com" />
+        <label class="elabel">Company name</label>
+        <input class="einput" type="text" id="user-company" placeholder="e.g. Acme Ltd" />
+        <div class="send-status" id="send-status">Sending your report...</div>
+        <button class="btn-submit" id="btn-submit" onclick="submitCapture()">GENERATE MY REPORT →</button>
+        <p style="font-size:11px;color:var(--muted2);text-align:center;margin-top:1rem;letter-spacing:0.05em">No spam. Used only to deliver your report.</p>
+      </div>
+    </div>
+
+    <div id="screen-report" class="screen">
+      <div class="success-banner" id="success-banner">✦ &nbsp;Report sent — check your inbox</div>
+      <div class="report-wrap" id="report-content"></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  emailjs.init('S8BAu5rv9hN1mVkLC');
+  const SERVICE_ID='hybridagents_service',TEMPLATE_ID='template_0alsha9';
+
+  function openQuiz(){
+    document.getElementById('quiz-backdrop').classList.add('open');
+    document.getElementById('quiz-modal').classList.add('open');
+    document.body.style.overflow='hidden';
+  }
+  function closeQuiz(){
+    document.getElementById('quiz-backdrop').classList.remove('open');
+    document.getElementById('quiz-modal').classList.remove('open');
+    document.body.style.overflow='';
+  }
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')closeQuiz();});
+
+  const QS=[
+    {id:1,sec:"Section 01 — AI Readiness",type:"scale",text:"How would you rate your own understanding of AI agents?",sub:"1 = No real knowledge  ·  5 = Expert, already running agentic systems",smin:"No knowledge",smax:"Expert level"},
+    {id:2,sec:"Section 01 — AI Readiness",type:"scale",text:"How would you rate your average employee's understanding of AI agents?",sub:"1 = None whatsoever  ·  5 = Comfortable using them daily",smin:"No knowledge",smax:"Use them daily"},
+    {id:3,sec:"Section 01 — AI Readiness",type:"multi",text:"Which areas are currently handled mostly manually?",sub:"Manual = the work would largely stop if the key person was away",opts:["Telephone enquiries","Email enquiries","Website enquiries / live chat / form submissions","Debt collection & payment chasing","Invoice generation & sending","Quote / proposal creation","Social media content creation, scheduling & engagement"]},
+    {id:4,sec:"Section 02 — Hidden Cost",type:"choice",text:"How many hours per week does your team spend on social media?",sub:"Content creation, scheduling, posting, engagement",opts:["Less than 5 hours","5–10 hours","10–20 hours","20+ hours"]},
+    {id:5,sec:"Section 02 — Hidden Cost",type:"choice",text:"What % of customer enquiries currently require full manual handling?",sub:"Phone, email and website enquiries combined",opts:["Less than 30%","30–60%","60–90%","More than 90%"]},
+    {id:6,sec:"Section 02 — Hidden Cost",type:"choice",text:"How many hours per week are spent on repetitive ops & finance tasks?",sub:"Invoicing, quotes, debt chasing, reporting",opts:["Less than 5 hours","5–15 hours","15–30 hours","30+ hours"]},
+    {id:7,sec:"Section 02 — Hidden Cost",type:"choice",text:"How many hours per week do you personally spend on automatable tasks?",sub:"Approvals, oversight, admin, status checks",opts:["Less than 5 hours","5–10 hours","10–20 hours","20+ hours"]},
+    {id:8,sec:"Section 03 — Vision & Commitment",type:"scale",text:"How would you rate your team's happiness with their current workload?",sub:"1 = Extremely unhappy / high frustration  ·  5 = Love their jobs",smin:"Very unhappy",smax:"Love their work"},
+    {id:9,sec:"Section 03 — Vision & Commitment",type:"choice",text:"What is the single biggest factor hurting team morale right now?",sub:"Choose the one that resonates most",opts:["Repetitive admin & manual tasks","High volume of customer enquiries","Social media pressure & content demands","All of the above / combination"]},
+    {id:10,sec:"Section 03 — Vision & Commitment",type:"choice",text:"If AI handled 70–80% of routine enquiries, what impact on morale?",sub:"Human escalation only for complex cases",opts:["Minimal — morale is already good","Some positive improvement","Significant boost — less day-to-day frustration","Massive shift — team would feel far more valued"]},
+    {id:11,sec:"Section 03 — Vision & Commitment",type:"choice",text:"What monthly saving feels realistic if AI handled routine enquiries?",sub:"Time + cost combined estimate",opts:["Not sure yet","£2,000 – £5,000 / month","£5,000 – £10,000 / month","£10,000+ / month"]},
+    {id:12,sec:"Section 03 — Vision & Commitment",type:"choice",text:"What additional monthly revenue could AI-driven social media drive?",sub:"Better consistency, higher lead quality, less team time",opts:["Less than £2,000","£2,000 – £10,000","£10,000 – £20,000","£20,000+"]},
+    {id:13,sec:"Section 03 — Vision & Commitment",type:"choice",text:"Have you tried any AI tools in the last 12 months?",sub:"For support, marketing, or operations",opts:["Yes — delivered clear time or revenue gains","Yes — results were limited or inconsistent","Basic attempts with little success","No, we haven't tried yet"]},
+    {id:14,sec:"Section 03 — Vision & Commitment",type:"choice",text:"What is your top priority for the next 6 months?",sub:"Choose the one that matters most right now",opts:["Scaling social media revenue & leads with less effort","Cutting customer support enquiry handling time","Streamlining operations, invoicing & debt processes","Overall efficiency & regaining momentum"]},
+    {id:15,sec:"Section 03 — Vision & Commitment",type:"choice",text:"If AI proved clear ROI within 30–60 days, when would you explore it?",sub:"Time recovered + money saved, clear proof",opts:["Within the next 30 days","1–3 months from now","3–6 months from now","Not right now"]}
+  ];
+
+  let cur=0,ans={},multi={};
+
+  function startQuiz(){document.getElementById('screen-intro').classList.remove('active');document.getElementById('screen-quiz').classList.add('active');renderQ();}
+
+  function renderQ(){
+    const q=QS[cur],c=document.getElementById('q-container');
+    c.className='q-anim';void c.offsetWidth;
+    let h=`<div class="sec-tag">${q.sec}</div><div class="q-num">Question ${String(q.id).padStart(2,'0')} of 15</div><div class="q-text">${q.text}</div><div class="q-sub">${q.sub}</div>`;
+    if(q.type==='scale'){
+      h+=`<div class="scale-grid">`;
+      for(let i=1;i<=5;i++)h+=`<button class="scale-btn${ans[q.id]===i?' sel':''}" onclick="selScale(${q.id},${i})">${i}</button>`;
+      h+=`</div><div class="scale-labels"><span class="slabel">${q.smin}</span><span class="slabel">${q.smax}</span></div>`;
+    }else if(q.type==='choice'){
+      const lbl=['A','B','C','D'];h+=`<div class="opts">`;
+      q.opts.forEach((o,i)=>{h+=`<button class="opt${ans[q.id]===i+1?' sel':''}" onclick="selChoice(${q.id},${i+1})"><span class="opt-ind">${lbl[i]}</span><span>${o}</span></button>`;});
+      h+=`</div>`;
+    }else{
+      if(!multi[q.id])multi[q.id]=[];
+      h+=`<div class="multi-hint">Select all that apply</div><div class="multi-grid">`;
+      q.opts.forEach((o,i)=>{h+=`<button class="mbtn${multi[q.id].includes(i)?' sel':''}" onclick="togMulti(${q.id},${i})"><span class="chk"></span><span>${o}</span></button>`;});
+      h+=`</div>`;
+    }
+    h+=`<div class="nav-row">${cur>0?`<button class="btn-back" onclick="goBack()">← Back</button>`:'<span></span>'}<button class="btn-next" onclick="goNext()"${canGo()?'':' disabled'}>${cur===QS.length-1?'SEE MY RESULTS →':'NEXT →'}</button></div>`;
+    c.innerHTML=h;updProg();
+    document.getElementById('quiz-modal').scrollTop=0;
+  }
+
+  function selScale(q,v){ans[q]=v;renderQ();}
+  function selChoice(q,v){ans[q]=v;renderQ();}
+  function togMulti(q,idx){if(!multi[q])multi[q]=[];const a=multi[q],p=a.indexOf(idx);p>-1?a.splice(p,1):a.push(idx);ans[q]=a.length;renderQ();}
+  function canGo(){const q=QS[cur];return q.type==='multi'||ans[q.id]!==undefined;}
+  function goNext(){if(!canGo())return;cur<QS.length-1?(cur++,renderQ()):showCap();}
+  function goBack(){if(cur>0){cur--;renderQ();}}
+  function updProg(){document.getElementById('prog-fill').style.width=((cur+1)/QS.length*100)+'%';document.getElementById('prog-count').textContent=String(cur+1).padStart(2,'0')+' / 15';}
+  function showCap(){document.getElementById('screen-quiz').classList.remove('active');document.getElementById('screen-capture').classList.add('active');document.getElementById('quiz-modal').scrollTop=0;}
+
+  function calcScore(){let s=0;s+=ans[1]||1;s+=ans[2]||1;s+=(multi[3]?multi[3].length:0);for(let q=4;q<=7;q++)s+=ans[q]||1;s+=(6-(ans[8]||3));for(let q=9;q<=15;q++)s+=ans[q]||1;return s;}
+
+  function getTier(sc){
+    if(sc<=25)return{num:'01',label:'CURIOUS & CAUTIOUS',color:'#b85c00',hook:"Let's automate one workflow and show you the ROI firsthand.",cta:'Start with one automation — no complexity, no risk.',desc:'Early-stage awareness with manual processes in place. The opportunity is there — you need a low-risk, high-confidence starting point that proves the model before scaling it.'};
+    if(sc<=40)return{num:'02',label:'FEELING THE FRICTION',color:'#7a6000',hook:"Your biggest bottleneck is clear — let's solve that one first.",cta:'Identify your highest-ROI automation and act on it now.',desc:"The manual drag is real, your team is feeling it, and the hidden cost is significant. You don't need a full overhaul — you need the right entry point with measurable output."};
+    if(sc<=55)return{num:'03',label:'PRIMED FOR GROWTH',color:'#0a0a0a',hook:"You're ready — let's build your AI roadmap and start this quarter.",cta:'Get your bespoke AI roadmap — built around your priorities.',desc:'Strong operational pain, growing AI awareness, real financial upside. Everything is in place to move. A structured roadmap will turn this into measurable results fast.'};
+    return{num:'04',label:'READY TO LEAD',color:'#006644',hook:"Every week without agentic AI is costing you money. Move now.",cta:"Book a strategy call this week — let's build your advantage.",desc:"High urgency, maximum ROI potential, real competitor risk. Your window to gain a significant market advantage is open — but it won't stay that way for long."};
+  }
+
+  function getManualAreas(){const mn=multi[3]||[];const areas=["Telephone enquiries","Email enquiries","Website enquiries / live chat","Debt collection & payment chasing","Invoice generation","Quote & proposal creation","Social media management"];return mn.length>0?mn.map(i=>areas[i]).join(', '):'None selected';}
+
+  function getPains(){
+    const mn=multi[3]||[];const areas=["telephone enquiries","email enquiries","website enquiries & live chat","debt collection & payment chasing","invoice generation","quote & proposal creation","social media management"];const pains=[];
+    if(mn.length>0){const named=mn.slice(0,3).map(i=>areas[i]).join(', ');pains.push({ico:'⚡',title:'High-value manual workflows identified',body:`You're manually managing ${named}${mn.length>3?` and ${mn.length-3} more`:''} — prime candidates for automation with immediate time returns.`});}
+    if((ans[5]||1)>=3)pains.push({ico:'📞',title:'Customer enquiry bottleneck',body:'Over 60% of your enquiries need full manual handling. A hybrid AI agent resolves the majority autonomously — freeing your team for high-value conversations only.'});
+    const lhrs=[0,5,12,22,35];
+    if((ans[7]||1)>=2)pains.push({ico:'⏱',title:`~${lhrs[(ans[7]||1)-1]}+ hrs/week lost as a leader`,body:'Time on repetitive admin is time not spent on strategy and growth. Agentic workflows can return this within weeks, not months.'});
+    if((ans[8]||3)<=2)pains.push({ico:'👥',title:'Team morale at risk',body:'Low morale tied to repetitive work drives turnover, reduces quality, and slows everything. Automation removes the friction your team hates most.'});
+    if(pains.length===0)pains.push({ico:'✦',title:'Efficiency opportunities identified',body:'Even with good current processes, there are clear areas where agentic AI would compound your output without adding headcount.'});
+    return pains;
+  }
+
+  async function submitCapture(){
+    const name=document.getElementById('user-name').value.trim()||'there';
+    const email=document.getElementById('user-email').value.trim();
+    const company=document.getElementById('user-company').value.trim()||'your business';
+    if(!email||!email.includes('@')){alert('Please enter a valid email address.');return;}
+    const score=calcScore(),tier=getTier(score);
+    const savMap=["Unquantified — let's find out together","£2,000–£5,000 / month","£5,000–£10,000 / month","£10,000+ / month"];
+    const revMap=["Under £2,000 / month","£2,000–£10,000 / month","£10,000–£20,000 / month","£20,000+ / month"];
+    const saving=savMap[(ans[11]||1)-1],revenue=revMap[(ans[12]||1)-1];
+    const timeline=["within the next 30 days","within 1–3 months","within 3–6 months","when the timing is right"][(ans[15]||1)-1];
+    const priority=["Scaling social media revenue & leads","Cutting customer support handling time","Streamlining operations & finance","Overall efficiency & momentum"][(ans[14]||1)-1];
+    const btn=document.getElementById('btn-submit'),status=document.getElementById('send-status');
+    btn.disabled=true;btn.textContent='SENDING...';status.classList.add('visible');
+    let emailSent=false;
+    try{await emailjs.send(SERVICE_ID,TEMPLATE_ID,{name,email,company,score:`${score} / 74`,tier:`Tier ${tier.num} — ${tier.label}`,hook:tier.hook,cta:tier.cta,saving,revenue,priority,timeline,manual_areas:getManualAreas()});emailSent=true;}
+    catch(e){console.error('EmailJS:',e);}
+    status.classList.remove('visible');
+    buildReport(name,email,company,score,tier,saving,revenue,timeline,priority,emailSent);
+  }
+
+  function buildReport(name,email,company,score,tier,saving,revenue,timeline,priority,emailSent){
+    const pains=getPains();
+    document.getElementById('screen-capture').classList.remove('active');
+    document.getElementById('screen-report').classList.add('active');
+    if(emailSent)document.getElementById('success-banner').classList.add('visible');
+    document.getElementById('quiz-modal').scrollTop=0;
+    document.getElementById('report-content').innerHTML=`
+      <div class="rpt-header">
+        <div style="font-size:10px;letter-spacing:0.18em;text-transform:uppercase;color:${tier.color};margin-bottom:1.25rem;font-family:'DM Sans',sans-serif;display:flex;align-items:center;justify-content:center;gap:8px">
+          <span style="width:8px;height:8px;border-radius:50%;background:${tier.color};display:inline-block"></span>Tier ${tier.num} — ${tier.label}
+        </div>
+        <div class="score-ring"><span class="score-big">${score}</span><span class="score-denom">/ 74</span></div>
+        <div class="rpt-tier">${tier.label}</div>
+        <div class="rpt-headline">${tier.desc}</div>
+      </div>
+      <div class="rpt-block">
+        <div class="rpt-block-title">Your key pain points</div>
+        ${pains.map(p=>`<div class="pain-row"><div class="pain-ico">${p.ico}</div><div><div class="pain-title">${p.title}</div><div class="pain-body">${p.body}</div></div></div>`).join('')}
+      </div>
+      <div class="rpt-block">
+        <div class="rpt-block-title">Your financial opportunity</div>
+        <div class="opp-grid">
+          <div class="opp-cell"><div class="opp-label">Est. monthly saving</div><div class="opp-val">${saving}</div></div>
+          <div class="opp-cell"><div class="opp-label">Revenue potential</div><div class="opp-val">${revenue}</div></div>
+        </div>
+        <div class="callout"><div class="callout-text">${company} has identified real financial upside. These are your own estimates — and they're the baseline we'd build a business case around.</div></div>
+      </div>
+      <div class="rpt-block">
+        <div class="rpt-block-title">Recommended next step</div>
+        <div class="callout" style="border-color:${tier.color}">
+          <div class="callout-text" style="font-weight:500;color:${tier.color}">✦ &nbsp;${tier.hook}</div>
+        </div>
+        <div style="font-size:13px;color:var(--muted);line-height:1.7;margin-top:1rem">Your top priority is <strong style="color:var(--ink)">${priority}</strong>. You're open to exploring this <strong style="color:var(--ink)">${timeline}</strong>. That's exactly the window we work within — fast proof, clear ROI, no long commitments before you see results.</div>
+      </div>
+      <div class="cta-block">
+        <div class="cta-title">READY TO SEE IT IN ACTION?</div>
+        <div class="cta-desc">${tier.cta}<br><br>Book a no-obligation 30-minute strategy call. We'll map your first automation and show you the numbers — before you commit to anything.</div>
+        <a class="btn-cta" href="https://calendly.com/athena-hybridagents" target="_blank" rel="noopener">BOOK YOUR STRATEGY CALL →</a>
+        <div class="email-note">${emailSent?`✦ &nbsp;Full report sent to ${email}`:`Report generated for ${email}`}</div>
+      </div>`;
+  }
+</script>
+</body>
+</html>
